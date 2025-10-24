@@ -1,0 +1,74 @@
+# ===============================
+# Core Python and ML project setup
+# ===============================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.venv/
+env/
+ENV/
+
+# IDE / Editor folders
+.vscode/
+.idea/
+*.swp
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.orig
+*.out
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Large data / model directories
+# ===============================
+
+# Datasets
+data/
+datasets/
+*.csv
+*.xlsx
+*.zip
+
+# Model checkpoints or weights
+models/
+*.h5
+*.pt
+*.pth
+*.joblib
+*.pkl
+
+# ===============================
+# Node / Frontend (if any)
+# ===============================
+node_modules/
+dist/
+build/
+
+# ===============================
+# Allow only essential project files
+# ===============================
+!README.md
+!requirements.txt
+!environment.yml
+!main.py
+!app.py
+!train.py
+!test.py
+!config.yaml
+!backend/
+!frontend/
