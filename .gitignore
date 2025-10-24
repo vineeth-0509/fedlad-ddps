@@ -1,5 +1,5 @@
 # ===============================
-# Core Python and ML project setup
+# Core Python / ML Project
 # ===============================
 
 # Byte-compiled / optimized / DLL files
@@ -9,10 +9,10 @@ __pycache__/
 
 # Virtual environments
 venv/
-.env/
 .venv/
 env/
 ENV/
+.env/
 
 # IDE / Editor folders
 .vscode/
@@ -44,7 +44,7 @@ datasets/
 *.xlsx
 *.zip
 
-# Model checkpoints or weights
+# Model checkpoints / serialized models
 models/
 *.h5
 *.pt
@@ -53,14 +53,29 @@ models/
 *.pkl
 
 # ===============================
-# Node / Frontend (if any)
+# Node.js / Next.js / Frontend
 # ===============================
+
+# Node modules
 node_modules/
+
+# Next.js build & export folders
+.next/
+out/
 dist/
 build/
 
+# Frontend environment files
+.env*
+
 # ===============================
-# Allow only essential project files
+# Optional / Coverage / Testing
+# ===============================
+.coverage
+htmlcov/
+
+# ===============================
+# Explicitly allow key files
 # ===============================
 !README.md
 !requirements.txt

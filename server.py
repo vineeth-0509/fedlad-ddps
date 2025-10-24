@@ -1,6 +1,3 @@
-
-
-
 import flwr as fl
 from flwr.server.server import ServerConfig
 from flwr.common import ndarrays_to_parameters, parameters_to_ndarrays
