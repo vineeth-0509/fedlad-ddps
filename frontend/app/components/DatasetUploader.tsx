@@ -64,7 +64,7 @@ const DatasetUploader: React.FC<Props> = ({ onUploadComplete }) => {
 
         // ✅ Automatically trigger dashboard refresh
         setTimeout(() => {
-          if (onUploadComplete) onUploadComplete(result.summary);
+          if (onUploadComplete) onUploadComplete({summary: result.summary});
         }, 1500);
       } else {
         const errText = await response.text();
