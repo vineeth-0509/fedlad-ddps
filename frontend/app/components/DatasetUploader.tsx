@@ -64,7 +64,7 @@ const DatasetUploader: React.FC<Props> = ({ onUploadComplete }) => {
 
         // ✅ Automatically trigger dashboard refresh
         setTimeout(() => {
-          if (onUploadComplete) onUploadComplete({summary: result.summary});
+          if (onUploadComplete) onUploadComplete({ summary: result.summary });
         }, 1500);
       } else {
         const errText = await response.text();
@@ -82,7 +82,9 @@ const DatasetUploader: React.FC<Props> = ({ onUploadComplete }) => {
 
   return (
     <div className="p-6 border border-slate-700 rounded-2xl bg-slate-800/60 shadow-lg space-y-4">
-      <h2 className="text-xl font-semibold text-cyan-400">📤 Upload New Dataset</h2>
+      <h2 className="text-xl font-semibold text-cyan-400">
+        📤 Upload New Dataset
+      </h2>
       <p className="text-sm text-gray-400">
         Upload your CSV dataset to retrain the federated DDoS detection model.
       </p>
@@ -102,8 +104,7 @@ const DatasetUploader: React.FC<Props> = ({ onUploadComplete }) => {
           uploading
             ? "bg-gray-600 cursor-not-allowed"
             : "bg-cyan-600 hover:bg-cyan-700"
-        }`}
-      >
+        }`}>
         {uploading ? "Uploading..." : "Start Upload"}
       </button>
 
@@ -119,7 +120,9 @@ const DatasetUploader: React.FC<Props> = ({ onUploadComplete }) => {
 
       {/* Status Message */}
       {message && (
-        <p className="text-sm text-gray-300 mt-2 whitespace-pre-wrap">{message}</p>
+        <p className="text-sm text-gray-300 mt-2 whitespace-pre-wrap">
+          {message}
+        </p>
       )}
     </div>
   );

@@ -1,245 +1,24 @@
-# import os, sys, json, shutil, traceback
-# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import os
+import json
+import shutil
+import traceback
+from pathlib import Path
+from time import sleep
 
-# import pandas as pd
-# from fastapi import FastAPI, File, UploadFile, HTTPException
-# from fastapi.middleware.cors import CORSMiddleware
-# from fastapi.responses import StreamingResponse
-# from datetime import datetime
-# from time import sleep
-# from typing import Generator
-
-# # Import your ML utilities
-# # NOTE: The imported 'train_and_evaluate' must return a dict with 'accuracy', 'f1_score', 'precision', and 'recall' keys.
-# from model_utils import preprocess_local_dataset, train_and_evaluate
-
-# app = FastAPI(title="FedLAD API Server")
-
-# # --- Enable CORS for frontend ---
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],    # Update to your Next.js origin if needed
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# # Ensure necessary directories exist
-# os.makedirs("data/uploads", exist_ok=True)
-# os.makedirs("logs", exist_ok=True)
-
-# # --- Upload Endpoint ---
-# @app.post("/upload")
-# async def upload_dataset(file: UploadFile = File(...)):
-#     """
-#     Accepts a dataset (CSV), saves it, runs preprocessing + training, logs results,
-#     and includes dynamic severity metrics in the response.
-#     """
-#     upload_dir = os.path.join("data", "uploads")
-#     logs_dir = "logs"
-
-#     file_path = os.path.join(upload_dir, file.filename)
-#     evaluation_log = os.path.join(logs_dir, "evaluation.json")
-#     metrics_log = os.path.join(logs_dir, "metrics_logs.json")
-
-#     try:
-#         # Save uploaded file
-#         with open(file_path, "wb") as buffer:
-#             shutil.copyfileobj(file.file, buffer)
-
-#         if not file.filename.endswith(".csv"):
-#             # Clean up the partially saved file if it's the wrong type
-#             os.remove(file_path)
-#             raise HTTPException(status_code=400, detail="Only CSV files are supported.")
-
-#         print("⚙️  Preprocessing local dataset...")
-#         df = pd.read_csv(file_path)
-
-#         if df.empty:
-#             raise HTTPException(status_code=400, detail="Uploaded CSV is empty or invalid.")
-
-#         original_shape = df.shape
-#         processed_df, le, scaler = preprocess_local_dataset(df)
-#         print(f"✅ Preprocessed dataset shape: {processed_df.shape}")
-
-#         # Train model
-#         print("🚀 Training XGBoost model...")
-#         metrics = train_and_evaluate(processed_df)
-#         print("✅ Training completed successfully!")
-
-#         # --- Compute severity dynamically (NEW LOGIC) ---
-#         print("📊 Computing severity data...")
-#         # Get metrics with a default of 0 to prevent KeyError if missing
-#         # acc = metrics.get("accuracy", 0)
-#         # f1 = metrics.get("f1_score", 0)
-#         # prec = metrics.get("precision", 0)
-#         # rec = metrics.get("recall", 0)
-#         avg_attack_conf = metrics.get("avg_attack_confidence", 0) * 100
-#         attack_types_conf = metrics.get("attack_types_confidence", [50, 30, 15, 5])
-
-#         severity_data = [
-#             {"label": "DDoS", "confidence": attack_types_conf[0], "severity": 9.5},
-#             {"label": "UDP Flood", "confidence": attack_types_conf[1], "severity": 7.5},
-#             {"label": "PortScan", "confidence": attack_types_conf[2], "severity": 6.5},
-#             {"label": "WebAttack", "confidence": attack_types_conf[3], "severity": 5.5},
-#             {"label": "Benign", "confidence": round(100 - avg_attack_conf, 2), "severity": 1.0},
-#          ]
-
-
-#         # --- Prepare log entries ---
-#         timestamp = datetime.utcnow().isoformat()
-#         evaluation_entry = {
-#             "timestamp": timestamp,
-#             "dataset": file.filename,
-#             "model": "XGBoost",
-#             "severity_data": severity_data,  # <-- ADDED
-#             **metrics
-#         }
-
-#         # --- Append to evaluation.json ---
-#         if os.path.exists(evaluation_log):
-#             try:
-#                 with open(evaluation_log, "r", encoding="utf-8") as f:
-#                     data = json.load(f)
-#                     if not isinstance(data, list):
-#                         data = []
-#             except json.JSONDecodeError:
-#                 data = []
-#         else:
-#             data = []
-
-#         data.append(evaluation_entry)
-
-#         # Safe write (atomic replace)
-#         tmp_path = evaluation_log + ".tmp"
-#         with open(tmp_path, "w", encoding="utf-8") as f:
-#             json.dump(data, f, indent=2)
-#         os.replace(tmp_path, evaluation_log)
-
-#         # --- Append to metrics_logs.json (NDJSON) ---
-#         with open(metrics_log, "a", encoding="utf-8") as f:
-#             # Added severity_data to the metrics log entry
-#             json.dump({"timestamp": timestamp, "metrics": metrics, "severity_data": severity_data}, f)
-#             f.write("\n")
-
-#         # --- Return summary ---
-#         summary = {
-#             "original_shape": original_shape,
-#             "processed_shape": processed_df.shape,
-#             "metrics": metrics,
-#             "severity_data": severity_data,  # <-- ADDED to the return summary
-#             "sample_preview": processed_df.head(5).to_dict(orient="records"),
-#         }
-
-#         return {
-#             "message": f"✅ File '{file.filename}' uploaded, preprocessed, trained, and logged successfully!",
-#             "summary": summary,
-#         }
-
-#     except Exception as e:
-#         print("❌ ERROR during upload:", e)
-#         traceback.print_exc()
-#         # Clean up the partially saved file on general error
-#         if os.path.exists(file_path):
-#             try:
-#                 os.remove(file_path)
-#             except OSError:
-#                 pass # Ignore if removal fails
-#         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
-
-
-
-
-# # --- Metrics Endpoint ---
-# @app.get("/metrics")
-# def get_metrics():
-#     """
-#     Reads the latest metrics from logs/metrics_logs.json (if exists).
-#     Returns an average of recent runs or most recent metrics.
-#     """
-#     metrics_file = "logs/metrics_logs.json"
-#     if not os.path.exists(metrics_file):
-#         raise HTTPException(status_code=404, detail="Metrics log not found")
-
-#     metrics_list = []
-#     with open(metrics_file, "r", encoding="utf-8") as f:
-#         for line in f:
-#             try:
-#                 entry = json.loads(line)
-#                 # Append the entire metrics section, which now includes severity_data
-#                 metrics_list.append(entry) 
-#             except Exception:
-#                 continue
-
-#     if not metrics_list:
-#         raise HTTPException(status_code=400, detail="No metrics found")
-
-#     # Use the latest metrics for display
-#     latest_entry = metrics_list[-1]
-    
-#     # Return the metrics and severity data from the latest run
-#     return {"strategy": "XGBoost (Local)", **latest_entry}
-
-
-# # --- Training Status (SSE Streaming Endpoint) ---
-# @app.get("/training-status")
-# def training_status() -> StreamingResponse:
-#     """
-#     Streams training progress updates to the frontend in real-time.
-#     Example use: progress bars or console logs in Next.js UI.
-#     """
-
-#     def event_stream() -> Generator[str, None, None]:
-#         steps = [
-#             "Preparing dataset...",
-#             "Preprocessing data...",
-#             "Training model...",
-#             "Evaluating model...",
-#             "Saving metrics...",
-#             "Training completed successfully 🎉",
-#         ]
-#         for step in steps:
-#             yield f"data: {step}\n\n"
-#             sleep(1.5)
-
-#     return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-
-# # --- Root endpoint ---
-# @app.get("/")
-# def root():
-#     return {"message": "🚀 FedLAD FastAPI server is running!"}
-
-
-# # --- Server startup ---
-# if __name__ == "__main__":
-#     import uvicorn
-#     # Directories are checked before uvicorn.run for convenience
-#     os.makedirs("data/uploads", exist_ok=True)
-#     os.makedirs("logs", exist_ok=True)
-#     print("🚀 Starting FedLAD FastAPI Server on http://127.0.0.1:8000")
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
-
-
-import os, sys, json, shutil, traceback
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from datetime import datetime
-from time import sleep
-from typing import Generator
 
-# ML utilities
-from model_utils import preprocess_local_dataset, train_and_evaluate
+from model_utils import train_and_evaluate_final
+from federated_training import run_federated_learning
 
 app = FastAPI(title="FedLAD API Server")
 
-# CORS
+# ---------------------------------------
+#               CORS
+# ---------------------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -248,201 +27,242 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create dirs
-os.makedirs("data/uploads", exist_ok=True)
-os.makedirs("logs", exist_ok=True)
+# ---------------------------------------
+#          DIRECTORIES
+# ---------------------------------------
+BASE_DIR = Path(__file__).parent
+UPLOAD_DIR = BASE_DIR / "data/uploads"
+CLIENT_DIR = BASE_DIR / "data/clients"
+LOGS_DIR = BASE_DIR / "logs"
 
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+CLIENT_DIR.mkdir(parents=True, exist_ok=True)
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
+# ===============================================================
+#   Utility: Convert NumPy → Python types
+# ===============================================================
+def to_python(obj):
+    """Convert numpy types into native python types."""
+    if isinstance(obj, (np.integer, )):
+        return int(obj)
+    if isinstance(obj, (np.floating, )):
+        return float(obj)
+    if isinstance(obj, (np.ndarray, )):
+        return obj.tolist()
+    return obj
 
-# ---------------------------------------------------------
-#  POST /upload
-# ---------------------------------------------------------
+def clean_dict(d: dict):
+    """Recursively convert all values inside dict."""
+    clean = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            clean[k] = clean_dict(v)
+        elif isinstance(v, list):
+            clean[k] = [clean_dict(i) if isinstance(i, dict) else to_python(i) for i in v]
+        else:
+            clean[k] = to_python(v)
+    return clean
+
+# ===============================================================
+#   Utility: Write NDJSON safely
+# ===============================================================
+def append_jsonl(path: Path, data: dict):
+    """Write JSON object as a single NDJSON line."""
+    cleaned = clean_dict(data)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(cleaned) + "\n")
+
+# ===============================================================
+#  POST /upload — dataset upload + split + centralized baseline
+# ===============================================================
 @app.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
-    upload_dir = "data/uploads"
-    logs_dir = "logs"
-
-    file_path = os.path.join(upload_dir, file.filename)
-    evaluation_log = os.path.join(logs_dir, "evaluation.json")
-    metrics_log = os.path.join(logs_dir, "metrics_logs.json")
-
     try:
-        # save uploaded file
+        file_path = UPLOAD_DIR / file.filename
+
+        # Save uploaded file
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        if not file.filename.endswith(".csv"):
-            os.remove(file_path)
-            raise HTTPException(status_code=400, detail="Only CSV files are allowed.")
+        if not file.filename.lower().endswith(".csv"):
+            file_path.unlink(missing_ok=True)
+            raise HTTPException(400, "Only CSV files are supported.")
 
-        print("⚙️  Preprocessing dataset...")
         df = pd.read_csv(file_path)
-
         if df.empty:
-            raise HTTPException(status_code=400, detail="CSV is empty or invalid.")
+            raise HTTPException(400, "Uploaded CSV is empty.")
 
-        original_shape = df.shape
-        processed_df, le, scaler = preprocess_local_dataset(df)
+        # ---- Create 3 clients ----
+        df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+        splits = np.array_split(df_shuffled, 3)
 
-        print(f"✅ Preprocessed shape: {processed_df.shape}")
+        for i, split_df in enumerate(splits, start=1):
+            split_df.to_csv(CLIENT_DIR / f"client_{i}.csv", index=False)
 
-        print("🚀 Training model...")
-        metrics = train_and_evaluate(processed_df)
-        print("✅ Training complete!")
+        # ---- Centralized XGBoost baseline ----
+        try:
+            raw_metrics = train_and_evaluate_final(df, label_col="Label")
+            metrics = clean_dict(raw_metrics)
+        except Exception as e:
+            traceback.print_exc()
+            metrics = {"error": f"Training failed: {str(e)}"}
 
-        # --------------------------
-        # Severity calculation
-        # --------------------------
-        print("📊 Computing severity metrics...")
+        # ---- Build severity summary (UI friendly) ----
+        severity_summary = []
+        total_rows = df.shape[0]
 
-        avg_attack_conf = metrics.get("avg_attack_confidence", 0) * 100
-        attack_types_conf = metrics.get("attack_types_confidence", [50, 30, 15, 5])
+        for label in df["Label"].unique():
+            count = int(df[df["Label"] == label].shape[0])
+            confidence = round((count / total_rows) * 100, 2)
+            severity_summary.append({
+                "label": str(label),
+                "confidence": float(confidence),
+                "severity": float(round(confidence / 10, 2)),
+            })
 
-        severity_data = [
-            {"label": "DDoS", "confidence": attack_types_conf[0], "severity": 9.5},
-            {"label": "UDP Flood", "confidence": attack_types_conf[1], "severity": 7.5},
-            {"label": "PortScan", "confidence": attack_types_conf[2], "severity": 6.5},
-            {"label": "WebAttack", "confidence": attack_types_conf[3], "severity": 5.5},
-            {"label": "Benign", "confidence": round(100 - avg_attack_conf, 2), "severity": 1.0},
-        ]
-
-        timestamp = datetime.utcnow().isoformat()
-
-        evaluation_entry = {
-            "timestamp": timestamp,
-            "dataset": file.filename,
-            "model": "XGBoost",
-            "severity_data": severity_data,
+        # ---- Save centralized metrics ----
+        append_jsonl(LOGS_DIR / "metrics_logs.json", {
+            "strategy": "Centralized XGBoost",
             "metrics": metrics
-        }
+        })
 
-        # -----------------------------------
-        # Append to evaluation.json (JSON list)
-        # -----------------------------------
-        if os.path.exists(evaluation_log):
-            try:
-                with open(evaluation_log, "r") as f:
-                    data = json.load(f)
-                    if not isinstance(data, list):
-                        data = []
-            except:
-                data = []
-        else:
-            data = []
-
-        data.append(evaluation_entry)
-
-        tmp = evaluation_log + ".tmp"
-        with open(tmp, "w") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp, evaluation_log)
-
-        # -----------------------------------
-        # Append to metrics_logs.json (NDJSON)
-        # -----------------------------------
-        with open(metrics_log, "a", encoding="utf-8") as f:
-            json.dump({
-                "timestamp": timestamp,
-                "metrics": metrics,
-                "severity_data": severity_data
-            }, f)
-            f.write("\n")
+        # ---- Save evaluation summary ----
+        append_jsonl(LOGS_DIR / "evaluation.json", {
+            "dataset": file.filename,
+            "metrics": metrics,
+            "severity_data": severity_summary
+        })
 
         return {
-            "message": f"✅ File '{file.filename}' uploaded and trained successfully!",
+            "message": "Upload complete. Dataset split into 3 clients.",
             "summary": {
-                "original_shape": original_shape,
-                "processed_shape": processed_df.shape,
+                "clients_created": 3,
                 "metrics": metrics,
-                "severity_data": severity_data,
-                "sample_preview": processed_df.head(5).to_dict(orient="records"),
-            }
+                "severity_data": severity_summary,
+                "preview": df.head(5).to_dict(orient="records"),
+            },
         }
 
     except Exception as e:
         traceback.print_exc()
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except:
-                pass
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, f"Upload failed: {str(e)}")
 
+# ===============================================================
+#  POST /federated-train
+# ===============================================================
+@app.post("/federated-train")
+def federated_train(rounds: int = 3, client_count: int = 3):
+    try:
+        # Ensure client files exist
+        for i in range(1, client_count + 1):
+            if not (CLIENT_DIR / f"client_{i}.csv").exists():
+                raise HTTPException(400, f"Missing client_{i}.csv")
 
+        results = run_federated_learning(client_count, rounds)
 
-# ---------------------------------------------------------
-#  GET /logs   -------------- (Needed for UI)
-# ---------------------------------------------------------
+        # Append each round to NDJSON
+        for r in results:
+            append_jsonl(LOGS_DIR / "federated_logs.json", clean_dict(r))
+
+        return {
+            "message": "Federated training completed.",
+            "rounds": len(results),
+            "results": results
+        }
+
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(500, f"Federated training failed: {e}")
+
+# ===============================================================
+# GET /logs — evaluation.json (NDJSON)
+# ===============================================================
 @app.get("/logs")
 def get_logs():
-    log_file = "logs/evaluation.json"
-    if not os.path.exists(log_file):
-        return []  # return empty list for first run
+    path = LOGS_DIR / "evaluation.json"
+    if not path.exists():
+        return []
 
-    try:
-        with open(log_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else []
-    except:
-        return []  # corrupted file fallback
+    items = []
+    with open(path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                try:
+                    items.append(json.loads(line))
+                except:
+                    continue
+    return items
 
-
-
-# ---------------------------------------------------------
-#  GET /metrics
-# ---------------------------------------------------------
+# ===============================================================
+# GET /metrics — latest centralized metric
+# ===============================================================
 @app.get("/metrics")
 def get_metrics():
-    metrics_file = "logs/metrics_logs.json"
-    if not os.path.exists(metrics_file):
+    path = LOGS_DIR / "metrics_logs.json"
+    if not path.exists():
         return {}
 
-    metrics_list = []
-    with open(metrics_file, "r", encoding="utf-8") as f:
+    items = []
+    with open(path, "r") as f:
         for line in f:
-            try:
-                metrics_list.append(json.loads(line))
-            except:
-                continue
+            if line.strip():
+                try:
+                    items.append(json.loads(line))
+                except:
+                    continue
 
-    if not metrics_list:
-        return {}
+    return items[-1] if items else {}
 
-    return metrics_list[-1]  # latest
+# ===============================================================
+# GET /federated-results — NDJSON reader
+# ===============================================================
+@app.get("/federated-results")
+def get_federated_results():
+    path = LOGS_DIR / "federated_logs.json"
+    if not path.exists():
+        return []
 
+    items = []
+    with open(path, "r") as f:
+        for line in f:
+            if line.strip():
+                try:
+                    items.append(json.loads(line))
+                except:
+                    continue
 
+    return items
 
-# ---------------------------------------------------------
-#  GET /training-status (SSE)
-# ---------------------------------------------------------
+# ===============================================================
+# SSE Status Stream
+# ===============================================================
 @app.get("/training-status")
 def training_status():
-    def event_stream():
+    def stream():
         steps = [
             "Preparing dataset...",
-            "Preprocessing data...",
-            "Training model...",
-            "Evaluating...",
-            "Saving logs...",
-            "Training complete 🎉"
+            "Preprocessing...",
+            "Training...",
+            "Aggregating...",
+            "Final evaluation...",
+            "Training complete 🎉",
         ]
-        for s in steps:
-            yield f"data: {s}\n\n"
+        for msg in steps:
+            yield f"data: {msg}\n\n"
             sleep(1)
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
-
-# ---------------------------------------------------------
+# ===============================================================
 # Root
-# ---------------------------------------------------------
+# ===============================================================
 @app.get("/")
 def root():
-    return {"message": "🚀 FedLAD FastAPI running!"}
-
-
+    return {"message": "FedLAD API running!"}
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting FedLAD FastAPI Server on http://127.0.0.1:8000")
+    print("🚀 Starting FedLAD FastAPI on http://127.0.0.1:8000")
     uvicorn.run(app, host="0.0.0.0", port=8000)
